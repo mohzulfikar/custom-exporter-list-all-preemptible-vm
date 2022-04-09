@@ -20,21 +20,8 @@ import (
 )
 
 func explicit(jsonPath, projectID string) {
-	var isPreemptibleTemp = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "nodes_preemptibles",
-			Help: "Preemptible instance",
-		},
-		[]string{
-			// name of each metrics
-			"node_name",
-			"node_cluster",
-			"node_preemptibility",
-		},
-	)
-	reg.MustRegister(isPreemptibleTemp)
 	for {
-		isPreemptibleTemp.Reset()
+		isPreemptible.Reset()
 		fmt.Printf("WAITING.......")
 		time.Sleep(5 * time.Second)
 		ctx := context.Background()
@@ -65,16 +52,11 @@ func explicit(jsonPath, projectID string) {
 					fmt.Printf("\n================================================================================================\n")
 					// fmt.Printf("%+v\n", instance)
 					isPreemptible.With(prometheus.Labels{"node_name": instance.GetName(), "node_cluster": instance.GetName(), "node_preemptibility": fmt.Sprintf("%v", *instance.GetScheduling().Preemptible)}).Set(0)
-					fmt.Printf("- Name: %s\n- Type: %s\n- Preemptible: %v\n", instance.GetName(), instance.GetMachineType(), *instance.GetScheduling().Preemptible)
 				}
 			}
 		}
-		isPreemptible = isPreemptibleTemp
-		reg.Unregister(isPreemptibleTemp)
-		hasil, err := isPreemptible.GetMetricWith(prometheus.Labels{})
-		fmt.Printf("%#v\n", hasil)
-		fmt.Printf("%#v\n", isPreemptibleTemp)
 
+		// for debugging only, prints metrics on stdout
 		gatherers := prometheus.Gatherers{
 			reg,
 		}
@@ -114,9 +96,8 @@ func init() {
 }
 
 func main() {
-	// go recordMetrics()
 	go explicit("./creds.json", "")
 
-	http.Handle("/something", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
-	http.ListenAndServe(":9191", nil)
+	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	http.ListenAndServe(":9009", nil)
 }
